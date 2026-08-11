@@ -71,7 +71,10 @@ const {isVerification} = require(process.argv[1] + "/work-ledger.js");
 const proves = ["curl https://x.com", "npm test", "npm run build", "pytest -q", "psql -c select 1",
                 "systemctl is-active nginx", "go test ./...", "tsc --noEmit", "black --check .",
                 // found in real use: running a test script directly must count
-                "bash tests/run-tests.sh", "./run-tests.sh", "sh scripts/test-all.sh"];
+                "bash tests/run-tests.sh", "./run-tests.sh", "sh scripts/test-all.sh",
+                // found in real use: querying a remote for its actual state must count
+                "gh api repos/x/y", "gh repo view x/y --json name", "gh run list",
+                "aws s3api list-buckets", "gcloud compute instances list"];
 const provesNothing = ["git add -A", "git commit -m x", "ls -la", "cd /tmp", "echo hi",
                        "mkdir foo", "cat file.txt", "git push origin main",
                        "bash deploy.sh", "bash install.sh"];

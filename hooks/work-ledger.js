@@ -60,6 +60,11 @@ const VERIFICATION_PATTERNS = [
   // Found by using this hook for real: the suite for these very hooks did not clear the ledger.
   /\b(?:bash|sh|zsh)\s+[^\s;|&]*test[^\s;|&]*\.(?:sh|bash)\b/,
   /(?:^|[\s;|&])\.?\/?[^\s;|&]*test[^\s;|&]*\.(?:sh|bash)\b/,
+  // Querying a remote service for its actual state is verification. Also found in real use:
+  // confirming a published license via "gh api" did not clear the ledger.
+  /\bgh\s+(?:api|repo\s+view|run\s+(?:list|view)|pr\s+(?:view|checks))\b/,
+  /\baws\s+\w+\s+(?:describe|get|list)-/,
+  /\bgcloud\s+\w+\s+(?:describe|list)\b/,
 ];
 
 function isVerification(command) {
