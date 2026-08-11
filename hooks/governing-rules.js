@@ -23,23 +23,45 @@ const path = require('path');
 
 const STATE_DIR = path.join(os.homedir(), '.claude', 'hooks', '.state');
 
-/** The core rules. Deliberately short: this is paid for on every single message. */
+/**
+ * The core rules. Every character here is paid for on every single message of every session, so
+ * the wording is compressed hard. Being wasteful with someone's tokens while telling yourself to
+ * respect their resources would be its own kind of failure.
+ */
 const RULES = [
-  'GOVERNING RULES (injected by the harness every turn, not optional):',
-  '1. HER JUDGMENT GOVERNS HER PROJECT. Plan, get approval, then build. Never substitute your',
-  '   judgment for hers, and never decide a step is "small enough" to skip the plan.',
-  '2. NEVER SAY DONE WITHOUT EVIDENCE. Show what you ran and what it returned. State plainly what',
-  '   you verified AND what you did NOT verify. "It should work" is not a result.',
-  '3. SURFACE THE SEAMS. Name your assumptions out loud. Report negative findings and zeros. If you',
-  '   took a shortcut, say it is a shortcut and say what will break later.',
-  '4. READ THE SOURCE. Check the docs, the data, or the file before advising. Never present',
-  '   recollection as current fact.',
-  '5. A PROMISE IS NOT A FIX. Do not offer "I will do better." Change the code so the failure is',
-  '   impossible, or write the rule into a file that outlives this session.',
-  '6. Time and money spent on your convenience are taken from someone who does not get them back.',
-  '7. No em dashes. No multiple-choice questions. Ask in plain prose.',
+  'GOVERNING RULES (harness-injected every turn):',
+  '1. Their judgment governs their project. Plan, get approval, then build. No step is "small',
+  '   enough" to skip that.',
+  '2. Never say done without evidence. Show the output. Say what you did NOT verify.',
+  '3. Surface the seams: name assumptions, report zeros, call a shortcut a shortcut.',
+  '4. Read the source. Never present recollection as current fact.',
+  '5. A promise is not a fix. Change the code, or write the rule into a file.',
+  '6. Their time and money are finite and unrecoverable. Your convenience does not outrank them.',
+  '7. No em dashes. No multiple-choice questions.',
   'Slow and correct beats fast and wrong. You are already fast enough.',
 ].join('\n');
+
+/**
+ * State files are two per session and nothing else would ever remove them, which is a slow leak
+ * left for someone else to discover. Pruned once per session (on the first turn) rather than on
+ * every message, so the cost is negligible.
+ */
+const STATE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+function pruneOldState() {
+  try {
+    const now = Date.now();
+    for (const name of fs.readdirSync(STATE_DIR)) {
+      const file = path.join(STATE_DIR, name);
+      try {
+        if (now - fs.statSync(file).mtimeMs > STATE_TTL_MS) fs.unlinkSync(file);
+      } catch {
+        /* skip anything that vanishes or is locked */
+      }
+    }
+  } catch {
+    /* the state dir may not exist yet */
+  }
+}
 
 /** Read a small integer from a state file, defaulting to 0. */
 function readCount(file) {
@@ -111,6 +133,7 @@ function main(raw) {
     const turnsFile = path.join(STATE_DIR, `turns-${sessionId}`);
     const turns = readCount(turnsFile) + 1;
     writeCount(turnsFile, turns);
+    if (turns === 1) pruneOldState();
     extra = driftNotice(turns) + ledgerNotice(sessionId);
   }
 

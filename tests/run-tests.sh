@@ -53,9 +53,11 @@ assert_valid_json governing-rules.js '{"session_id":"test-a","prompt":"hi"}' "va
 assert_valid_json governing-rules.js '' "empty stdin does not crash"
 assert_valid_json governing-rules.js 'not json at all {{{' "malformed stdin does not crash"
 assert_valid_json governing-rules.js '{}' "missing session_id does not crash"
-assert_contains governing-rules.js '{"session_id":"test-a"}' 'HER JUDGMENT GOVERNS' "injects the core rules"
-assert_contains governing-rules.js 'garbage' 'HER JUDGMENT GOVERNS' "injects rules even on garbage input"
+assert_contains governing-rules.js '{"session_id":"test-a"}' 'Never say done without evidence' "injects the core rules"
+assert_contains governing-rules.js 'garbage' 'Never say done without evidence' "injects rules even on garbage input"
 assert_contains governing-rules.js '{"session_id":"test-a"}' 'additionalContext' "uses the additionalContext channel"
+assert_contains governing-rules.js '{"session_id":"test-a"}' 'GOVERNING RULES' "block is labelled so it is recognisable in context"
+assert_contains governing-rules.js '{"session_id":"test-a"}' 'judgment governs' "carries the judgment-deference rule"
 
 echo
 echo "work-ledger.js"
