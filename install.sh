@@ -2,8 +2,8 @@
 # Install the guardrails: copy the hooks to ~/.claude/hooks/ and print the settings.json block.
 #
 # The hooks are installed to ~/.claude/hooks/ rather than run from this repo on purpose: hook
-# commands run through a shell, and this repo's path contains a space ("GitHub - GreySheep"), which
-# is a reliable source of quoting bugs. ~/.claude has no spaces.
+# commands run through a shell, and a checkout path containing a space is a reliable source of
+# quoting bugs. ~/.claude has no spaces.
 #
 # This script does NOT edit settings.json. Wiring hooks is a change to how every session behaves, so
 # it prints the block and lets a human decide. Silent config edits are exactly the kind of
