@@ -64,7 +64,8 @@ const VERIFICATION_PATTERNS = [
   // confirming a published license via "gh api" did not clear the ledger.
   /\bgh\s+(?:api|repo\s+view|run\s+(?:list|view)|pr\s+(?:view|checks))\b/,
   /\baws\s+\w+\s+(?:describe|get|list)-/,
-  /\bgcloud\s+\w+\s+(?:describe|list)\b/,
+  // gcloud nests groups: "gcloud compute instances list" has three words before the verb.
+  /\bgcloud\s+(?:[\w-]+\s+){1,3}(?:describe|list)\b/,
 ];
 
 function isVerification(command) {
