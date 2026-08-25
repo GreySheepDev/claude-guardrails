@@ -94,6 +94,33 @@ assert_not_contains pre-ship-check.js '{"tool_name":"Bash","tool_input":{"comman
 assert_valid_json pre-ship-check.js 'not json' "malformed stdin does not crash"
 assert_valid_json pre-ship-check.js '{}' "missing tool_input does not crash"
 
+
+echo
+echo "governing-rules.js: ledger watch (rule 9 enforcement)"
+# Build a disposable fixture: a repo ref newer than its ledger fires; touched ledger silences.
+LW="$(mktemp -d)"
+mkdir -p "$LW/repo/.git/refs/heads" "$LW/docs"
+echo x > "$LW/repo/.git/refs/heads/main"
+echo x > "$LW/docs/STATUS.md"
+node -e '
+const fs=require("fs");const p=process.argv[1];
+fs.writeFileSync(p+"/cfg.json",JSON.stringify({watches:[{label:"fixture",
+  gitRefs:[p+"/repo/.git/refs/heads/main"],ledgers:[p+"/docs/STATUS.md"],graceHours:2}]}));
+const old=(Date.now()-6*3600*1000)/1000;
+fs.utimesSync(p+"/docs/STATUS.md",old,old);
+' "$LW"
+out=$(printf '%s' '{"session_id":"lw-stale"}' | LEDGER_WATCH_CONFIG="$LW/cfg.json" node "$HOOKS/governing-rules.js" 2>/dev/null)
+case "$out" in *'LEDGER STALE (fixture)'*) ok "stale ledger fires the warning" ;; *) bad "stale ledger fires the warning" ;; esac
+touch "$LW/docs/STATUS.md"
+out=$(printf '%s' '{"session_id":"lw-fresh"}' | LEDGER_WATCH_CONFIG="$LW/cfg.json" node "$HOOKS/governing-rules.js" 2>/dev/null)
+case "$out" in *'LEDGER STALE ('*) bad "fresh ledger stays silent" ;; *) ok "fresh ledger stays silent" ;; esac
+out=$(printf '%s' '{"session_id":"lw-none"}' | LEDGER_WATCH_CONFIG="$LW/missing.json" node "$HOOKS/governing-rules.js" 2>/dev/null)
+case "$out" in *'LEDGER STALE ('*) bad "missing config stays silent" ;; *) ok "missing config stays silent" ;; esac
+echo '{{{' > "$LW/bad.json"
+assert_valid_json governing-rules.js '{"session_id":"lw-bad"}' "malformed ledger config does not crash"
+assert_contains governing-rules.js '{"session_id":"lw-r8"}' 'READ IT ALL FIRST' "carries rule 8 (read it all)"
+assert_contains governing-rules.js '{"session_id":"lw-r9"}' 'updates STATUS.md and BUILD_UPDATE.md' "carries rule 9 (ledger discipline)"
+rm -rf "$LW"
 echo
 echo "----------------------------------------"
 echo "passed: $PASS   failed: $FAIL"

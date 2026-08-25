@@ -38,8 +38,63 @@ const RULES = [
   '5. A promise is not a fix. Change the code, or write the rule into a file.',
   '6. Their time and money are finite and unrecoverable. Your convenience does not outrank them.',
   '7. No em dashes. No multiple-choice questions.',
+  '8. READ IT ALL FIRST. Before answering "where are we", auditing, or building on any document:',
+  '   her documents of record (STATUS.md, BUILD_UPDATE.md, the plan files, CONTINUITY.md) are',
+  '   read end to end, not grep-sampled. A file you only searched is a file you have not read.',
+  '9. Every milestone updates STATUS.md and BUILD_UPDATE.md before the work is called done. A',
+  '   LEDGER STALE line below is never argued with, only fixed.',
   'Slow and correct beats fast and wrong. You are already fast enough.',
 ].join('\n');
+
+/**
+ * LEDGER WATCH. Nicole, 2026-08-25: "I want the failure to update the continuance documents to
+ * end. I'm sick of being lied to about what's getting updated." Rules 8 and 9 above came from the
+ * same night: status was answered three times from the wrong sources while her ledgers sat stale.
+ *
+ * A promise would not fix that, so this is mechanical: when any watched repo carries a commit
+ * newer than the newest touch of its ledger files by more than the grace window, every keypress
+ * carries a LEDGER STALE line until the ledger catches up. Config is JSON at
+ * ~/.claude/hooks/ledger-watch.json ($LEDGER_WATCH_CONFIG overrides, for tests):
+ *   { "watches": [ { "label": "name", "gitRefs": ["<repo>/.git/refs/heads/main", ...],
+ *                    "ledgers": ["<STATUS.md path>", ...], "graceHours": 2 } ] }
+ * Missing, unreadable or malformed config is SILENT: this must never break a session or nag a
+ * machine that does not have the project.
+ */
+function newestMtime(files) {
+  let newest = 0;
+  for (const f of files || []) {
+    try {
+      const t = fs.statSync(f).mtimeMs;
+      if (t > newest) newest = t;
+    } catch {
+      /* a missing file simply does not count */
+    }
+  }
+  return newest;
+}
+
+function ledgerStaleNotice() {
+  try {
+    const cfgPath = process.env.LEDGER_WATCH_CONFIG
+      || path.join(os.homedir(), '.claude', 'hooks', 'ledger-watch.json');
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    const lines = [];
+    for (const w of (cfg && cfg.watches) || []) {
+      const ref = newestMtime(w.gitRefs);
+      const led = newestMtime(w.ledgers);
+      if (!ref || !led) continue;              // cannot judge what it cannot see
+      const graceMs = (w.graceHours == null ? 2 : w.graceHours) * 3600 * 1000;
+      if (ref - led > graceMs) {
+        const hrs = Math.round((ref - led) / 3600000);
+        lines.push(`LEDGER STALE (${w.label}): commits are ~${hrs}h newer than the status ledger. `
+          + 'Update STATUS.md and BUILD_UPDATE.md before reporting anything as done.');
+      }
+    }
+    return lines.length ? '\n' + lines.join('\n') : '';
+  } catch {
+    return '';
+  }
+}
 
 /**
  * State files are two per session and nothing else would ever remove them, which is a slow leak
@@ -136,6 +191,8 @@ function main(raw) {
     if (turns === 1) pruneOldState();
     extra = driftNotice(turns) + ledgerNotice(sessionId);
   }
+  // Outside the session-id guard on purpose: a stale ledger nags even if session state is broken.
+  extra += ledgerStaleNotice();
 
   emit(RULES + extra);
 }
