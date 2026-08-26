@@ -114,6 +114,21 @@ case "$out" in *'LEDGER STALE (fixture)'*) ok "stale ledger fires the warning" ;
 touch "$LW/docs/STATUS.md"
 out=$(printf '%s' '{"session_id":"lw-fresh"}' | LEDGER_WATCH_CONFIG="$LW/cfg.json" node "$HOOKS/governing-rules.js" 2>/dev/null)
 case "$out" in *'LEDGER STALE ('*) bad "fresh ledger stays silent" ;; *) ok "fresh ledger stays silent" ;; esac
+# The 2026-08-26 loophole, planted so it can never return: TWO ledger files, only one updated.
+# The stale one must keep the warning firing; updating both must silence it.
+node -e '
+const fs=require("fs");const p=process.argv[1];
+fs.writeFileSync(p+"/docs/BUILD_UPDATE.md","x");
+fs.writeFileSync(p+"/cfg.json",JSON.stringify({watches:[{label:"fixture",
+  gitRefs:[p+"/repo/.git/refs/heads/main"],ledgers:[p+"/docs/STATUS.md",p+"/docs/BUILD_UPDATE.md"],graceHours:2}]}));
+const old=(Date.now()-6*3600*1000)/1000;
+fs.utimesSync(p+"/docs/BUILD_UPDATE.md",old,old);   // BUILD_UPDATE rots while STATUS is fresh
+' "$LW"
+out=$(printf '%s' '{"session_id":"lw-half"}' | LEDGER_WATCH_CONFIG="$LW/cfg.json" node "$HOOKS/governing-rules.js" 2>/dev/null)
+case "$out" in *'LEDGER STALE ('*) ok "one fresh file cannot silence a stale sibling" ;; *) bad "one fresh file cannot silence a stale sibling" ;; esac
+touch "$LW/docs/BUILD_UPDATE.md"
+out=$(printf '%s' '{"session_id":"lw-both"}' | LEDGER_WATCH_CONFIG="$LW/cfg.json" node "$HOOKS/governing-rules.js" 2>/dev/null)
+case "$out" in *'LEDGER STALE ('*) bad "both fresh silences the warning" ;; *) ok "both fresh silences the warning" ;; esac
 out=$(printf '%s' '{"session_id":"lw-none"}' | LEDGER_WATCH_CONFIG="$LW/missing.json" node "$HOOKS/governing-rules.js" 2>/dev/null)
 case "$out" in *'LEDGER STALE ('*) bad "missing config stays silent" ;; *) ok "missing config stays silent" ;; esac
 echo '{{{' > "$LW/bad.json"

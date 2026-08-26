@@ -73,6 +73,28 @@ function newestMtime(files) {
   return newest;
 }
 
+/**
+ * The OLDEST ledger file governs, not the newest. On 2026-08-25 Nicole caught the loophole in the
+ * newest-file version: updating STATUS.md alone silenced this warning while BUILD_UPDATE.md and
+ * CONTINUITY.md rotted, and the assistant then reported the whole ledger as current. Her word for
+ * that was lying, and she is right. So the laziest file now sets the verdict: EVERY watched ledger
+ * must be at least as fresh as the newest commit, and a missing ledger counts as infinitely stale
+ * instead of being skipped.
+ */
+function oldestMtime(files) {
+  let oldest = Infinity;
+  for (const f of files || []) {
+    let t = 0;
+    try {
+      t = fs.statSync(f).mtimeMs;
+    } catch {
+      t = 0; // a missing ledger is the stalest possible ledger
+    }
+    if (t < oldest) oldest = t;
+  }
+  return oldest === Infinity ? 0 : oldest;
+}
+
 function ledgerStaleNotice() {
   try {
     const cfgPath = process.env.LEDGER_WATCH_CONFIG
@@ -81,13 +103,14 @@ function ledgerStaleNotice() {
     const lines = [];
     for (const w of (cfg && cfg.watches) || []) {
       const ref = newestMtime(w.gitRefs);
-      const led = newestMtime(w.ledgers);
-      if (!ref || !led) continue;              // cannot judge what it cannot see
+      const led = oldestMtime(w.ledgers);
+      if (!ref) continue;                      // no repo on this machine: nothing to judge
       const graceMs = (w.graceHours == null ? 2 : w.graceHours) * 3600 * 1000;
       if (ref - led > graceMs) {
         const hrs = Math.round((ref - led) / 3600000);
-        lines.push(`LEDGER STALE (${w.label}): commits are ~${hrs}h newer than the status ledger. `
-          + 'Update STATUS.md and BUILD_UPDATE.md before reporting anything as done.');
+        lines.push(`LEDGER STALE (${w.label}): the least-recently-updated ledger file is ~${hrs}h `
+          + 'behind the newest commit. EVERY ledger file must be current, not just one. Update '
+          + 'STATUS.md and BUILD_UPDATE.md before reporting anything as done.');
       }
     }
     return lines.length ? '\n' + lines.join('\n') : '';
