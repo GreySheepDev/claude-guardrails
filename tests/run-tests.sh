@@ -138,6 +138,55 @@ assert_contains governing-rules.js '{"session_id":"lw-r4"}' 'BEFORE her latest m
 assert_contains governing-rules.js '{"session_id":"lw-r9"}' 'updates STATUS.md and BUILD_UPDATE.md' "carries rule 9 (ledger discipline)"
 rm -rf "$LW"
 echo
+
+# ── fresh-files-gate.js: "read what she names," enforced ─────────────────────────────
+# Nicole, 2026-08-27: "WHY CAN THEY NOT ENFORCE 'READ WHAT SHE NAMES'?" These tests prove the
+# gate CLOSES (the must-fail direction) before trusting that it opens.
+echo "fresh-files-gate.js: the read-what-she-names gate"
+FF="$(mktemp -d)"
+command -v cygpath >/dev/null && FF="$(cygpath -m "$FF")"   # node needs a real Windows path
+mkdir -p "$FF/root" "$FF/state"
+export FRESH_FILES_CONFIG="$FF/cfg.json"
+export FRESH_FILES_STATE="$FF/state"
+printf '{"roots":["%s"]}' "$FF/root" > "$FF/cfg.json"
+G() { printf '%s' "$1" | node "$HOOKS/fresh-files-gate.js" 2>/dev/null; }
+
+out=$(G '{"hook_event_name":"UserPromptSubmit","session_id":"ff","prompt":"hello"}')
+[ -z "$out" ] && ok "first prompt only stamps, says nothing" || bad "first prompt only stamps, says nothing"
+
+sleep 1
+echo data > "$FF/root/her-download.zip"
+out=$(G '{"hook_event_name":"UserPromptSubmit","session_id":"ff","prompt":"use the files I just downloaded"}')
+case "$out" in *her-download.zip*) ok "new file is listed by name" ;; *) bad "new file is listed by name" ;; esac
+case "$out" in *"GATE IS ARMED"*) ok "file cue arms the gate" ;; *) bad "file cue arms the gate" ;; esac
+
+out=$(G '{"hook_event_name":"PreToolUse","session_id":"ff","tool_name":"Edit","tool_input":{"file_path":"x.js"}}')
+case "$out" in *'"permissionDecision":"deny"'*) ok "GATE CLOSED: Edit denied while her file is unread" ;; *) bad "GATE CLOSED: Edit denied while her file is unread" ;; esac
+
+G "{\"hook_event_name\":\"PostToolUse\",\"session_id\":\"ff\",\"tool_name\":\"Read\",\"tool_input\":{\"file_path\":\"$FF/root/her-download.zip\"},\"tool_response\":{}}" >/dev/null
+out=$(G '{"hook_event_name":"PreToolUse","session_id":"ff","tool_name":"Edit","tool_input":{"file_path":"x.js"}}')
+[ -z "$out" ] && ok "reading her file opens the gate" || bad "reading her file opens the gate"
+
+sleep 1
+echo more > "$FF/root/quiet-change.txt"
+out=$(G '{"hook_event_name":"UserPromptSubmit","session_id":"ff","prompt":"how are the meetings looking"}')
+case "$out" in *quiet-change.txt*) ok "no cue: change still listed" ;; *) bad "no cue: change still listed" ;; esac
+out=$(G '{"hook_event_name":"PreToolUse","session_id":"ff","tool_name":"Edit","tool_input":{"file_path":"x.js"}}')
+[ -z "$out" ] && ok "no cue: gate stays open" || bad "no cue: gate stays open"
+
+G '{"hook_event_name":"PostToolUse","session_id":"ff","tool_name":"Edit","tool_input":{"file_path":"'"$FF"'/root/mine.js"},"tool_response":{}}' >/dev/null
+sleep 1
+echo mine > "$FF/root/mine.js"
+out=$(G '{"hook_event_name":"UserPromptSubmit","session_id":"ff","prompt":"any new files down there"}')
+case "$out" in *mine.js*) bad "assistant-written files are not flagged as hers" ;; *) ok "assistant-written files are not flagged as hers" ;; esac
+
+FRESH_FILES_CONFIG="$FF/nope.json" out=$(G '{"hook_event_name":"UserPromptSubmit","session_id":"ff2","prompt":"downloaded files"}')
+[ -z "$out" ] && ok "missing config is silent" || bad "missing config is silent"
+assert_valid_json fresh-files-gate.js '{{{' "malformed input does not crash"
+
+unset FRESH_FILES_CONFIG FRESH_FILES_STATE
+rm -rf "$FF"
+echo
 echo "----------------------------------------"
 echo "passed: $PASS   failed: $FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
