@@ -134,6 +134,7 @@ case "$out" in *'LEDGER STALE ('*) bad "missing config stays silent" ;; *) ok "m
 echo '{{{' > "$LW/bad.json"
 assert_valid_json governing-rules.js '{"session_id":"lw-bad"}' "malformed ledger config does not crash"
 assert_contains governing-rules.js '{"session_id":"lw-r8"}' 'READ IT ALL FIRST' "carries rule 8 (read it all)"
+assert_contains governing-rules.js '{"session_id":"lw-r4"}' 'BEFORE her latest message is recollection' "carries rule 4 stale-listing clause"
 assert_contains governing-rules.js '{"session_id":"lw-r9"}' 'updates STATUS.md and BUILD_UPDATE.md' "carries rule 9 (ledger discipline)"
 rm -rf "$LW"
 echo
