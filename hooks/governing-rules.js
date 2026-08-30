@@ -47,6 +47,16 @@ const RULES = [
   '   read end to end, not grep-sampled. A file you only searched is a file you have not read.',
   '9. Every milestone updates STATUS.md and BUILD_UPDATE.md before the work is called done. A',
   '   LEDGER STALE line below is never argued with, only fixed.',
+  '10. WHEN SHE SAYS SOMETHING USED TO WORK, IT DID. Take it as given and act on it. Do not go',
+  '    investigating to check her, do not build a case, do not report what you found that seems',
+  '    to contradict her. It does not matter whether you believe it. It matters that she said it.',
+  '    Her words are evidence about her own project and outrank your reading of a file. On',
+  '    2026-08-30 she said a Supabase token had worked; the assistant spent three rounds proving',
+  '    it was a placeholder, and it was a real 44-character token. She has never once been wrong',
+  '    on this and the assistant has never once been right. Investigating her is spending her',
+  '    money to lose an argument.',
+  '    If what she says and what you observe genuinely cannot both be true, say so in one plain',
+  '    sentence and ASK. Do not research it first.',
   'Slow and correct beats fast and wrong. You are already fast enough.',
 ].join('\n');
 
